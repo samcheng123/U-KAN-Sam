@@ -54,30 +54,40 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         img_id = self.img_ids[idx]
-        
+    
+    # Load the image
         img = cv2.imread(os.path.join(self.img_dir, img_id + self.img_ext))
-
+        if img is None:
+            raise FileNotFoundError(f"Image file not found: {os.path.join(self.img_dir, img_id + self.img_ext)}")
+    
+    # Load the mask(s)
         mask = []
         for i in range(self.num_classes):
+            mask_path = os.path.join(self.mask_dir, str(i), img_id + self.mask_ext)
+            mask_img = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        
+            if mask_img is None:
+                raise FileNotFoundError(f"Mask file not found: {mask_path}")
+        
+            mask.append(mask_img[..., None])  # Expand dimensions to ensure shape consistency
+    
+        mask = np.dstack(mask)  # Stack masks along the third dimension
 
-            # print(os.path.join(self.mask_dir, str(i),
-            #             img_id + self.mask_ext))
-
-            mask.append(cv2.imread(os.path.join(self.mask_dir, str(i),
-                        img_id + self.mask_ext), cv2.IMREAD_GRAYSCALE)[..., None])
-        mask = np.dstack(mask)
-
+    # Apply transformations, if any
         if self.transform is not None:
             augmented = self.transform(image=img, mask=mask)
             img = augmented['image']
             mask = augmented['mask']
-        
-        img = img.astype('float32') / 255
-        img = img.transpose(2, 0, 1)
-        mask = mask.astype('float32') / 255
-        mask = mask.transpose(2, 0, 1)
+    
+    # Normalize and rearrange dimensions for PyTorch (channels-first)
+        img = img.astype('float32') / 255.0
+        img = torch.tensor(img.transpose(2, 0, 1), dtype=torch.float32)  # Convert to torch tensor
+    
+        mask = mask.astype('float32') / 255.0
+        mask = torch.tensor(mask.transpose(2, 0, 1), dtype=torch.float32)  # Convert to torch tensor
 
-        if mask.max()<1:
-            mask[mask>0] = 1.0
+    # Ensure binary mask values
+        mask[mask > 0] = 1.0
 
         return img, mask, {'img_id': img_id}
+

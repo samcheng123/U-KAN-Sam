@@ -34,3 +34,9 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+#import torch
+#print("GPU Available:", torch.cuda.is_available())
+
+#import sys
+#print(sys.prefix)
